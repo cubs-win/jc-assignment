@@ -41,18 +41,26 @@ type hashHandler struct {
 
 func (handler *hashHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     if r.Method == "POST" {
+        if err := r.ParseForm(); err != nil {
+            log.Println(err)
+            http.Error(w, err.Error(), http.StatusBadRequest)
+            return
+        }
 
-        r.ParseForm()
-        pw := r.Form["password"][0]
-        // TODO - check the dimension of the pw array and handle errors 
-        time.Sleep(5 * time.Second)
-        fmt.Fprintf(w, HashAndEncodePassword(pw))
-
-        return
-    } 
-    // Only support the methods explicitly enumerated above,
-    // otherwise we return NotFound.
-    http.NotFound(w,r)
+        if pw,ok := r.Form["password"]; ok && len(pw) == 1 {
+            time.Sleep(5 * time.Second)
+            fmt.Fprintf(w, HashAndEncodePassword(pw[0]))
+            return
+        } else {
+            // No password in request, or more than 1. 
+            http.Error(w, "Invalid Form Data", http.StatusBadRequest)
+            return
+        }
+    } else {
+        // Only support POST
+        // otherwise we respond with NotFound.
+        http.NotFound(w,r)
+    }
 }
 
 type shutdownHandler struct {
@@ -105,9 +113,10 @@ func main() {
 
     // Start listening for incoming connections
     // This blocks until srv.Shutdown() is called in doShutdownWhenChannelSignaled
-    srv.ListenAndServe()
+    retval := srv.ListenAndServe()
+    log.Println("ListenAndServe returned ", retval)
 
-    log.Println("Main waiting for shutdown handler to signal done...")
+    log.Println("main(): Waiting for shutdown handler to signal done...")
     // Wait for the shutdown handler to signal it's done.
     _ = <- theContext.exit // Blocks until signaled by doShutdownWhenChannelSignaled 
     log.Println("Main OUT")

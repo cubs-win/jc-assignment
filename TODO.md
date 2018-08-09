@@ -1,5 +1,4 @@
-# You have to check the return code from ListenandServe and only wait on the channel if it was shutdown. 
-# A non-graceful shutdown in that case will still work properly
+# Add support for SIGTERM? 
 # Run a go linter
 # Consider ptuting the (global) http server in the context so that you have no globals
 # Add tests. For example, test that the hash function returns the expected value for "angryMonkey"
