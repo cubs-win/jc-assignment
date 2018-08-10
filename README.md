@@ -13,16 +13,19 @@ your terminal prompt.
    via the command line flag --port.
    For example, to run on port 1234: $jc-assignment --port 1234.
 5. You can run $jc-assignment -h to see the usage information.
+6. You can run the unit tests: $go test
 
 Notes:
 
 
 
 Assumptions:
-
-
-Open Questions:
-1. For the stats endpoint, do we want the statistics to be persistent?
-
+1. I'm assuming that the stats data returned by the /stats call is
+   not persisted across restarts of the server.
+2. I'm assuming that it is safe to store the average response time
+   in microseconds in a uint. A uint is at least 32 bits which means
+   we can represent up to 4294967295 microseconds which is about 
+   71 minutes. If our average response is longer than that something
+   is very wrong. :) 
 
 

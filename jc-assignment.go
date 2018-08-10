@@ -9,6 +9,7 @@ import (
     "time"
     "strconv"
     "flag"
+    "sync"
     "context"
 )
 
@@ -22,19 +23,40 @@ func HashAndEncodePassword(pw string) string {
     return base64.StdEncoding.EncodeToString([]byte(hashed[:]))
 }
 
-type serverContext struct {
-    exit chan int // Channel to signal main that work is done, time to exit
-    shutdown chan int  // Channel to signal that a shutdown request was received
+// A counter that's safe to use concurrently. 
+type safeCounter struct {
+    count uint
+    mux sync.Mutex
 }
 
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-//  
-// Define  a type for each HTTP handler 
-//
-//
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
+func (counter *safeCounter) Increment() {
+    counter.mux.Lock()
+    counter.count += 1
+    counter.mux.Unlock()
+}
+
+func (counter *safeCounter) Value() uint {
+    counter.mux.Lock()
+    defer counter.mux.Unlock()
+    return counter.count
+}
+
+type serverContext struct {
+    exit chan int          // Channel to signal main that work is done, time to exit
+    shutdown chan int      // Channel to signal that a shutdown request was received
+    hashCount safeCounter  // Count of hash requests handled for stats
+    avgResponseUsec uint   // Average response time in microseconds for stats
+}
+
+// A function to initialize a serverContext
+func (sc *serverContext) init() {
+    sc.exit = make(chan int)
+    sc.shutdown = make(chan int)
+}
+
+/////////////////////////////////////////
+// Define  a type for each HTTP handler / 
+/////////////////////////////////////////
 type hashHandler struct {
     sc *serverContext
 }
@@ -42,12 +64,12 @@ type hashHandler struct {
 func (handler *hashHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     if r.Method == "POST" {
         if err := r.ParseForm(); err != nil {
-            log.Println(err)
             http.Error(w, err.Error(), http.StatusBadRequest)
             return
         }
 
         if pw,ok := r.Form["password"]; ok && len(pw) == 1 {
+            handler.sc.hashCount.Increment() // Count it for stats tracking 
             time.Sleep(5 * time.Second)
             fmt.Fprintf(w, HashAndEncodePassword(pw[0]))
             return
@@ -79,6 +101,9 @@ func (handler *shutdownHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
     return
     
 }
+/////////////////////////////////////////
+//      End of HTTP handler section     /
+/////////////////////////////////////////
 
 func doShutdownWhenChannelSignaled(shutdown chan int, exit chan int) {
     _ = <- shutdown // Block until a shutdown request is received    
@@ -95,9 +120,8 @@ func main() {
     // Create a serverContext to be shared by the http handler goroutines
     var theContext serverContext
 
-    // Initialize the channels
-    theContext.exit = make(chan int)
-    theContext.shutdown = make(chan int)
+    // Initialize the context
+    theContext.init() 
    
     // Launch goroutine to wait for shutdown to be signaled
     go doShutdownWhenChannelSignaled(theContext.shutdown, theContext.exit) 
