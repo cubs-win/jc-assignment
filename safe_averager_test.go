@@ -7,8 +7,8 @@ import "math/rand"
 // A waitgroup to wait for the goroutines to complete before checking results.
 var wg sync.WaitGroup
 
-var numGoroutines int = 25
-var updatesPerGoroutine int = 100 
+var numGoroutines = 25
+var updatesPerGoroutine = 100 
 
 // A channel for the goroutines to send their times through 
 var myChan chan int64
@@ -22,7 +22,7 @@ func doSomeAveraging(num int, averager *safeAverager) {
     defer wg.Done()
 
     for i := 0; i < num; i++ {
-        var usecs int64 = rand.Int63n(5000000) + 1  // Random time between 1 usec and 5 sec
+        var usecs = rand.Int63n(5000000) + 1  // Random time between 1 usec and 5 sec
         myChan <- usecs
         averager.updateAverage(usecs)
     } 
@@ -58,15 +58,15 @@ func TestSafeAverager(t *testing.T) {
 
     count, avg := averager.getValues()
 
-    var expectedCount int64 = int64(numGoroutines * updatesPerGoroutine)
+    var expectedCount = int64(numGoroutines * updatesPerGoroutine)
 
     numTimes := int64(len(times))
-    var sum int64 = 0
+    var sum int64
     for _, val :=  range times {
         sum += val
     }
 
-    var expectedAverage float64 = float64(sum) / float64(numTimes)
+    var expectedAverage = float64(sum) / float64(numTimes)
 
     if count != expectedCount {
         t.Errorf("Counter value %v not equal to expected count %v.", count, expectedCount)

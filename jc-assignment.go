@@ -30,7 +30,7 @@ type safeAverager struct {
     mux sync.Mutex
 }
 
-// This function updates the average with the provided
+// updateAverage updates the running average with the provided
 // value and also increments the counter.
 func (avg *safeAverager) updateAverage(usecs int64) {
     avg.mux.Lock()
@@ -40,18 +40,22 @@ func (avg *safeAverager) updateAverage(usecs int64) {
     avg.mux.Unlock()
 }
 
+// getValues returns a tuple (count, avgUsecs) containing the current number
+// of hash requests that have been serviced and the average response time in microseconds.
 func (avg *safeAverager) getValues() (count int64, avgUsecs float64) {
     avg.mux.Lock()
     defer avg.mux.Unlock()
     return avg.count, avg.avgUsecs
 }
 
+// serverContext is a structure that holds state for the server process.
 type serverContext struct {
     exit chan int          // Channel to signal main that work is done, time to exit
     shutdown chan int      // Channel to signal that a shutdown request was received
     averager safeAverager  // Used to track stats in a thread safe manner.
 }
 
+// init is a convenience method to initialize a serverContext.
 // A function to initialize a serverContext
 func (sc *serverContext) init() {
     sc.exit = make(chan int)
@@ -61,10 +65,13 @@ func (sc *serverContext) init() {
 /////////////////////////////////////////
 // Define  a type for each HTTP handler / 
 /////////////////////////////////////////
+
+// hashHandler is an object to handle calls to the /hash endpoint
 type hashHandler struct {
     sc *serverContext
 }
 
+// ServeHTTP on the hashHandler object to implement the Handler interface
 func (handler *hashHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     if r.Method == "POST" {
         start := time.Now()
@@ -90,10 +97,12 @@ func (handler *hashHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     http.NotFound(w,r)
 }
 
+// shutdownHandler is an object to handle calls to the /shutdown endpoint
 type shutdownHandler struct {
     sc *serverContext
 }
 
+// ServeHTTP on the shutdownHandler object to implement the Handler interface.
 func (handler *shutdownHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "Shutdown request acknowledged.")
 
@@ -104,10 +113,12 @@ func (handler *shutdownHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
     return
 }
 
+// statsHandler is an object to handle calls to the /stats endpoint
 type statsHandler struct {
     sc *serverContext
 }
 
+// ServeHTTP on the statsHandler object to implement the Handler interface.
 func (handler *statsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     if r.Method == "GET" {
         // Grab the stats
@@ -138,12 +149,16 @@ func (handler *statsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 //      End of HTTP handler section     /
 /////////////////////////////////////////
 
+// doShutdownWhenChannelSignaled is a function that will run as a goroutine
+// to wait for a signal from the shutdownHandler. When the signal comes,
+// it will call Shutdown() on the http.Server object.
 func doShutdownWhenChannelSignaled(shutdown chan int, exit chan int) {
     _ = <- shutdown // Block until a shutdown request is received    
     srv.Shutdown(context.Background()) // This blocks until any pending HTTP handlers complete 
     exit <- 1 // Signal main that it's ok to exit now
 }
 
+// main is the program entry point
 func main() {
     port := flag.Int("port", 8080, "The TCP port to listen on for incoming HTTP connections.")
     flag.Parse()
