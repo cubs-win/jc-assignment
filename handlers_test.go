@@ -83,7 +83,29 @@ func TestHashHandlerReturns404OnGet(t *testing.T) {
 
     // Check the status code is what we expect.
     if status := rr.Code; status != http.StatusNotFound {
-        t.Errorf("handler returned wrong status code: got %v want %v",
+        t.Errorf("hash handler returned wrong status code: got %v want %v",
+            status, http.StatusNotFound)
+    }
+}
+
+// Test that if we call the statsHandler with the wrong method
+// we get the expected result code
+func TestStatsHandlerReturns404OnPost(t *testing.T) {
+    req, err := http.NewRequest("POST", "/stats", nil) 
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    rr := httptest.NewRecorder()
+
+    context := makeServerContext()
+
+    handler := statsHandler{sc:&context}
+    handler.ServeHTTP(rr, req)
+
+    // Check the status code is what we expect.
+    if status := rr.Code; status != http.StatusNotFound {
+        t.Errorf("stats handler returned wrong status code: got %v want %v",
             status, http.StatusNotFound)
     }
 }

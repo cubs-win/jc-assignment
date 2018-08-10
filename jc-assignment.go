@@ -50,7 +50,7 @@ func (avg *safeAverager) getValues() (count int64, avgUsecs float64) {
 type serverContext struct {
     exit chan int          // Channel to signal main that work is done, time to exit
     shutdown chan int      // Channel to signal that a shutdown request was received
-    averager safeAverager  // Count of hash requests handled for stats
+    averager safeAverager  // Used to track stats in a thread safe manner.
 }
 
 // A function to initialize a serverContext
@@ -104,10 +104,7 @@ func (handler *shutdownHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
     // goroutine to call srv.Shutdown()
     handler.sc.shutdown <- 1
 
-    log.Println("Shutdown handler OUT")
-     
     return
-    
 }
 
 type statsHandler struct {
@@ -115,25 +112,30 @@ type statsHandler struct {
 }
 
 func (handler *statsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    // Grab the stats
-    total, avg := handler.sc.averager.getValues()
-    averageAsInt := int64(avg) // The averager returns float64, truncate it to an integer for output 
-    fmt.Printf("Stats: total %v average %v\n", total, averageAsInt)
-    type Stats struct {
-        Total int64 `json:"total"`
-        Avg   int64 `json:"average"`
-    }
-    var o Stats
-    o.Total = total
-    o.Avg = averageAsInt
-    if output, err := json.Marshal(o); err == nil {
-        w.Header().Set("Content-Type", "application/json")
-        fmt.Fprintf(w, "%s", output)
+    if r.Method == "GET" {
+        // Grab the stats
+        total, avg := handler.sc.averager.getValues()
+        averageAsInt := int64(avg) // The averager returns float64, truncate it to int64 for output 
+
+        // Define a structure for our JSON output
+        type Stats struct {
+            Total int64 `json:"total"`
+            Avg   int64 `json:"average"`
+        }
+        o := Stats{Total:total, Avg:averageAsInt}
+
+        // Create JSON object from the structure
+        if output, err := json.Marshal(o); err == nil {
+            w.Header().Set("Content-Type", "application/json")
+            fmt.Fprintf(w, "%s", output)
+        } else {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }
     } else {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+        // Only support GET 
+        // otherwise we respond with NotFound.
+        http.NotFound(w,r)
     }
-   
-    
 }
 /////////////////////////////////////////
 //      End of HTTP handler section     /
@@ -141,9 +143,7 @@ func (handler *statsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func doShutdownWhenChannelSignaled(shutdown chan int, exit chan int) {
     _ = <- shutdown // Block until a shutdown request is received    
-    log.Println("Calling srv.Shutdown()... ###")
     srv.Shutdown(context.Background()) // This blocks until any pending HTTP handlers complete 
-    log.Println("Call to srv.Shutdown() returned *****")
     exit <- 1 // Signal main that it's ok to exit now
 }
 
@@ -175,8 +175,8 @@ func main() {
     retval := srv.ListenAndServe()
     log.Println("ListenAndServe returned ", retval)
 
-    log.Println("main(): Waiting for shutdown handler to signal done...")
-    // Wait for the shutdown handler to signal it's done.
+    log.Println("main(): Waiting for active work to finish...")
+    // Wait for the signal that active work is completed before we exit
     _ = <- theContext.exit // Blocks until signaled by doShutdownWhenChannelSignaled 
-    log.Println("Main OUT")
+    log.Println("main() OUT")
 }

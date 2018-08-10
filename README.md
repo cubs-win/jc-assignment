@@ -6,20 +6,16 @@ This is a repository for a programming exercise in Go.
 In these steps, the '$' is not meant to be typed, it indicates what to type at
 your terminal prompt.
 
-1. Clone the repo on your system in your go workspace.
+1. Clone the repo on your system in your go workspace. $git clone https://github.com/cubs-win/jc-assignment.git
 2. From inside the repository directory, build and install via $go install
 3. Run the program as a standalone command: $jc-assignment
 4. The program listens on localhost:8080 by default. The port can be changed
    via the command line flag --port.
    For example, to run on port 1234: $jc-assignment --port 1234.
 5. You can run $jc-assignment -h to see the usage information.
-6. You can run the unit tests: $go test
+6. You can run the unit tests: $go test -v
 
-Notes:
-
-
-
-Assumptions:
+**Assumptions**
 1. I'm assuming that the stats data returned by the /stats call is
    not persisted across restarts of the server.
 
