@@ -5,6 +5,7 @@ import (
     "log"
     "crypto/sha512"
     "encoding/base64"
+    "encoding/json"
     "net/http"
     "time"
     "strconv"
@@ -23,29 +24,33 @@ func HashAndEncodePassword(pw string) string {
     return base64.StdEncoding.EncodeToString([]byte(hashed[:]))
 }
 
-// A counter that's safe to use concurrently. 
-type safeCounter struct {
-    count uint
+// A counter and  average response time calculator that's safe to use concurrently
+type safeAverager struct {
+    avgUsecs float64
+    count int64 
     mux sync.Mutex
 }
 
-func (counter *safeCounter) Increment() {
-    counter.mux.Lock()
-    counter.count += 1
-    counter.mux.Unlock()
+// This function updates the average with the provided
+// value and also increments the counter.
+func (avg *safeAverager) updateAverage(usecs int64) {
+    avg.mux.Lock()
+    var totalTime float64 = avg.avgUsecs * float64(avg.count) + float64(usecs)
+    avg.count += 1
+    avg.avgUsecs = totalTime / float64(avg.count)
+    avg.mux.Unlock()
 }
 
-func (counter *safeCounter) Value() uint {
-    counter.mux.Lock()
-    defer counter.mux.Unlock()
-    return counter.count
+func (avg *safeAverager) getValues() (count int64, avgUsecs float64) {
+    avg.mux.Lock()
+    defer avg.mux.Unlock()
+    return avg.count, avg.avgUsecs
 }
 
 type serverContext struct {
     exit chan int          // Channel to signal main that work is done, time to exit
     shutdown chan int      // Channel to signal that a shutdown request was received
-    hashCount safeCounter  // Count of hash requests handled for stats
-    avgResponseUsec uint   // Average response time in microseconds for stats
+    averager safeAverager  // Count of hash requests handled for stats
 }
 
 // A function to initialize a serverContext
@@ -63,15 +68,18 @@ type hashHandler struct {
 
 func (handler *hashHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     if r.Method == "POST" {
+        start := time.Now()
         if err := r.ParseForm(); err != nil {
             http.Error(w, err.Error(), http.StatusBadRequest)
             return
         }
 
         if pw,ok := r.Form["password"]; ok && len(pw) == 1 {
-            handler.sc.hashCount.Increment() // Count it for stats tracking 
             time.Sleep(5 * time.Second)
             fmt.Fprintf(w, HashAndEncodePassword(pw[0]))
+            elapsed := time.Since(start)
+            // Track stats:
+            handler.sc.averager.updateAverage(elapsed.Nanoseconds()/1000) // Dividing by 1000 to convert ns to us
             return
         } else {
             // No password in request, or more than 1. 
@@ -99,6 +107,32 @@ func (handler *shutdownHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
     log.Println("Shutdown handler OUT")
      
     return
+    
+}
+
+type statsHandler struct {
+    sc *serverContext
+}
+
+func (handler *statsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    // Grab the stats
+    total, avg := handler.sc.averager.getValues()
+    averageAsInt := int64(avg) // The averager returns float64, truncate it to an integer for output 
+    fmt.Printf("Stats: total %v average %v\n", total, averageAsInt)
+    type Stats struct {
+        Total int64 `json:"total"`
+        Avg   int64 `json:"average"`
+    }
+    var o Stats
+    o.Total = total
+    o.Avg = averageAsInt
+    if output, err := json.Marshal(o); err == nil {
+        w.Header().Set("Content-Type", "application/json")
+        fmt.Fprintf(w, "%s", output)
+    } else {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+   
     
 }
 /////////////////////////////////////////
@@ -129,6 +163,7 @@ func main() {
     // Register the handlers. They all wrap the same serverContext.
     http.Handle("/hash", &hashHandler{sc:&theContext})
     http.Handle("/shutdown", &shutdownHandler{sc:&theContext})
+    http.Handle("/stats", &statsHandler{sc:&theContext})
 
     // Setup server to listen on specified port
     portString := ":" + strconv.Itoa(*port)

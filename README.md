@@ -22,10 +22,5 @@ Notes:
 Assumptions:
 1. I'm assuming that the stats data returned by the /stats call is
    not persisted across restarts of the server.
-2. I'm assuming that it is safe to store the average response time
-   in microseconds in a uint. A uint is at least 32 bits which means
-   we can represent up to 4294967295 microseconds which is about 
-   71 minutes. If our average response is longer than that something
-   is very wrong. :) 
 
 
