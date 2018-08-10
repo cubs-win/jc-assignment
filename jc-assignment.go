@@ -16,9 +16,8 @@ import (
 
 var srv http.Server
 
-// A utility function to take a sha512 hash of a password
+// HashAndEncodePassword A utility function to take a sha512 hash of a password
 // and base64 encode the result.
-//
 func HashAndEncodePassword(pw string) string {
     hashed := sha512.Sum512([]byte(pw))
     return base64.StdEncoding.EncodeToString([]byte(hashed[:]))
@@ -35,8 +34,8 @@ type safeAverager struct {
 // value and also increments the counter.
 func (avg *safeAverager) updateAverage(usecs int64) {
     avg.mux.Lock()
-    var totalTime float64 = avg.avgUsecs * float64(avg.count) + float64(usecs)
-    avg.count += 1
+    var totalTime = avg.avgUsecs * float64(avg.count) + float64(usecs)
+    avg.count++
     avg.avgUsecs = totalTime / float64(avg.count)
     avg.mux.Unlock()
 }
@@ -81,16 +80,14 @@ func (handler *hashHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
             // Track stats:
             handler.sc.averager.updateAverage(elapsed.Nanoseconds()/1000) // Dividing by 1000 to convert ns to us
             return
-        } else {
-            // No password in request, or more than 1. 
-            http.Error(w, "Invalid Form Data", http.StatusBadRequest)
-            return
         }
-    } else {
-        // Only support POST
-        // otherwise we respond with NotFound.
-        http.NotFound(w,r)
+        // No password in request, or more than 1. 
+        http.Error(w, "Invalid Form Data", http.StatusBadRequest)
+        return
     }
+    // Only support POST
+    // otherwise we respond with NotFound.
+    http.NotFound(w,r)
 }
 
 type shutdownHandler struct {
@@ -131,11 +128,11 @@ func (handler *statsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
         } else {
             http.Error(w, err.Error(), http.StatusInternalServerError)
         }
-    } else {
-        // Only support GET 
-        // otherwise we respond with NotFound.
-        http.NotFound(w,r)
+        return
     }
+    // Only support GET 
+    // otherwise we respond with NotFound.
+    http.NotFound(w,r)
 }
 /////////////////////////////////////////
 //      End of HTTP handler section     /
