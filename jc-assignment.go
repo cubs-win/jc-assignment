@@ -58,7 +58,6 @@ func (sc *serverContext) init() {
     sc.shutdown = make(chan int)
 }
 
-
 // doShutdownWhenChannelSignaled is a function that will run as a goroutine
 // to wait for a signal from the shutdownHandler. When the signal comes,
 // it will call Shutdown() on the http.Server object.
