@@ -6,6 +6,8 @@ import "net/url"
 import "testing"
 import "strings"
 
+// makeServerContext is a convenience function
+// used from within the Test* functions.
 func makeServerContext() serverContext {
     var sc serverContext
     sc.exit = make (chan int)

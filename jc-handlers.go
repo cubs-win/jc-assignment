@@ -52,6 +52,8 @@ func (handler *shutdownHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
     // Write to the shutdown channel which will cause another 
     // goroutine to call srv.Shutdown()
+    // Calling srv.Shutdown() can't be done from within a handler because it blocks until
+    // all active handlers  are finished, which can cause a deadlock.
     handler.sc.shutdown <- 1
 
     return

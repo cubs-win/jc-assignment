@@ -1,5 +1,6 @@
-This is a repository for a programming exercise in Go.
-
+**Overview**
+This is a repository for a programming exercise in Go. The main() function is in
+jc-assignment.go. The HTTP handlers are in jc-handlers.go.  
 
 **Instructions for running**
 
