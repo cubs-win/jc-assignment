@@ -53,7 +53,7 @@ func main() {
         go doHash("FruityPebbles1")
     }
 
-    // Sleep just long enough to let the requests be issued before we shutdown
+    // Sleep just long enough to let all the requests be issued before we shutdown
     time.Sleep(100 * time.Millisecond) 
 
     // Issue shutdown request

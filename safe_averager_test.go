@@ -18,10 +18,15 @@ var myChan chan int64
 var times []int64
 
 
-func doSomeAveraging(num int, averager *safeAverager) {
+// doSomeAverging iterates to repeatedly update the running average
+// kept by the safeAverager, using a randomly generated time value.
+// The time values are also sent back through a channel
+// so that the average can be checked against the value reported by
+// the averager.
+func doSomeAveraging(numIterations int, averager *safeAverager) {
     defer wg.Done()
 
-    for i := 0; i < num; i++ {
+    for i := 0; i < numIterations; i++ {
         var usecs = rand.Int63n(5000000) + 1  // Random time between 1 usec and 5 sec
         myChan <- usecs
         averager.updateAverage(usecs)
@@ -53,20 +58,19 @@ func TestSafeAverager(t *testing.T) {
 
     wg.Wait() // Wait until the goroutines finish before proceeding.
  
-    // Signal the collecTimes() function to exit
+    // Signal the collectTimes() function to exit
     myChan <- int64(-1) 
 
     count, avg := averager.getValues()
 
     var expectedCount = int64(numGoroutines * updatesPerGoroutine)
 
-    numTimes := int64(len(times))
     var sum int64
     for _, val :=  range times {
         sum += val
     }
 
-    var expectedAverage = float64(sum) / float64(numTimes)
+    var expectedAverage = float64(sum) / float64(expectedCount)
 
     if count != expectedCount {
         t.Errorf("Counter value %v not equal to expected count %v.", count, expectedCount)
