@@ -14,6 +14,12 @@ your terminal prompt.
    For example, to run on port 1234: $jc-assignment --port 1234.
 5. You can run $jc-assignment -h to see the usage information.
 6. You can run the unit tests: $go test -v
+7. I added a separate executable called hasher in tests/hasher which
+   you can run to test that multiple connections are processed simultaneously,
+   and that issuing a shutdown does not interrupt existing work.
+   To run it, cd into the test/hasher directory, do $go build, and
+   execute the program with $./hasher. Before doing so, start the 
+   jc-assignment server in a separate terminal window.
 
 **Assumptions**
 1. I'm assuming that the stats data returned by the /stats call is
