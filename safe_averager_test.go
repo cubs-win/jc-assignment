@@ -3,6 +3,7 @@ package main
 import "testing"
 import "sync"
 import "math/rand"
+import "time"
 
 // A waitgroup to wait for the goroutines to complete before checking results.
 var wg sync.WaitGroup
@@ -43,6 +44,10 @@ func collectTimes() {
 }
 
 func TestSafeAverager(t *testing.T) {
+    // Seed the random number generator with current time
+    // so that we get different test inputs  each run.
+    rand.Seed(time.Now().UTC().UnixNano())
+
     var averager safeAverager
     myChan = make(chan int64)
 
