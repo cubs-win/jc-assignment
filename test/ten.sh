@@ -11,6 +11,11 @@ curl  --data "password=feistyPuppy"  http://localhost:8080/hash &
 curl  --data "password=blueChipmunk" http://localhost:8080/hash &
 curl  --data "password=honestWolf"   http://localhost:8080/hash &
 
+echo "Pausing 1 sec..."
+sleep 1s
+echo "Issuing shutdown command."
+
+
 # Now that a bunch of requests are in progress, send the shutdown request
 curl http://localhost:8080/shutdown &
 
